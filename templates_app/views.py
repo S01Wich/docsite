@@ -36,14 +36,32 @@ def fill_template(request, pk):
                     for m in re.finditer(TAG_PATTERN, p.text):
                         tags.add(m.group('tag'))
 
-    # Сортировка: сначала по отсутствию цифр, затем по числовой части и по алфавиту
+    # Новая сортировка:
+    # 1) все теги, начинающиеся с 'ФИО' и не содержащие числового суффикса — первыми
+    # 2) затем по группам с числовым суффиксом '_<номер>':
+    #    - сначала все теги, которые начинаются с 'ФИО' и заканчиваются на '_<номер>'
+    #    - затем все остальные теги с тем же суффиксом (по алфавиту)
+    # 3) в конце — все прочие теги без числового суффикса (по алфавиту)
     def sort_key(tag):
-        m = re.match(r"(.+?)(\d+)$", tag)
-        if m:
-            return (int(m.group(2)), m.group(1).lower())
-        return (0, tag.lower())
+        # Проверяем числовой суффикс
+        m_num = re.match(r'^(.*)_(\d+)$', tag)
+        if m_num:
+            base = m_num.group(1)
+            num = int(m_num.group(2))
+            # Внутри группы num: теги, начинающиеся с 'ФИО', первыми
+            if base.startswith('ФИО'):
+                return (num, 0, base.lower())
+            return (num, 1, base.lower())
+        # Без числового суффикса
+        if tag.startswith('ФИО'):
+            # Все теги, начинающиеся с 'ФИО', без номера — перед всеми группами
+            return (-1, 0, tag.lower())
+        # Прочие теги без номера — после всех
+        return (float('inf'), 1, tag.lower())
+
     sorted_tags = sorted(tags, key=sort_key)
 
+    # Формируем форму с полями по отсортированным тегам
     TemplateForm = generate_template_form(sorted_tags)
 
     if request.method == 'POST':
@@ -52,7 +70,7 @@ def fill_template(request, pk):
             # Создаём копию документа для правок
             output_doc = Document(doc_path)
 
-            # Встроенная замена в каждом run, чтобы не трогать bold/italic и пр.
+            # Заменяем теги в параграфах, сохраняя стили
             for paragraph in output_doc.paragraphs:
                 for run in paragraph.runs:
                     if re.search(TAG_PATTERN, run.text):
@@ -61,10 +79,10 @@ def fill_template(request, pk):
                             lambda m: str(form.cleaned_data.get(m.group('tag'), '')),
                             run.text
                         )
-                    # Обновляем шрифт, не затрагивая остальные атрибуты
                     run.font.name = 'Times New Roman'
                     run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Times New Roman')
 
+            # Заменяем теги в таблицах, сохраняя стили
             for table in output_doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
@@ -79,7 +97,7 @@ def fill_template(request, pk):
                                 run.font.name = 'Times New Roman'
                                 run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Times New Roman')
 
-            # Формируем имя файла: <оригинал>_<YYYY-MM-DD>.docx
+            # Формируем имя выходного файла: <оригинал>_<YYYY-MM-DD>.docx
             basename = os.path.basename(doc_path)
             name, ext = os.path.splitext(basename)
             if not ext:
@@ -87,7 +105,7 @@ def fill_template(request, pk):
             date_str = datetime.now().strftime('%Y-%m-%d')
             output_filename = f"{name}_{date_str}{ext}"
 
-            # Сохраняем в MEDIA_ROOT и возвращаем
+            # Сохраняем и возвращаем файл
             os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
             output_path = os.path.join(settings.MEDIA_ROOT, output_filename)
             output_doc.save(output_path)
