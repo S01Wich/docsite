@@ -12,6 +12,7 @@ ALLOWED_HOSTS = [
     '127.0.0.1',
     'araksadocs.ru',
     '193.164.150.2',
+    'backend-eb58eaf5-4a8b-4093-ad71-2d186f70c9bf-http',
 ]
 
 STATIC_URL = '/static/'
