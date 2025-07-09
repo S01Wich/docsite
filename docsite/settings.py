@@ -15,9 +15,6 @@ ALLOWED_HOSTS = [
     'backend-eb58eaf5-4a8b-4093-ad71-2d186f70c9bf-http',
 ]
 
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-
 # Приложения
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -88,9 +85,18 @@ USE_L10N = True
 USE_TZ = True
 
 # Статика
-STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
+]
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://araksadocs.ru',
+    'https://araksadocs.ru',
+    'http://www.araksadocs.ru',
+    'https://www.araksadocs.ru',
 ]
 
 # Медиа (для загружаемых файлов DOCX)
